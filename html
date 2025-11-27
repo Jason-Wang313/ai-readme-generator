@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Alarm Buddies</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Puter.js (Free, High-Quality TTS API) -->
+    <script src="https://js.puter.com/v2/"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Custom animation for the loader */
+        @keyframes bounce-delay {
+
+            0%,
+            80%,
+            100% {
+                transform: scale(0);
+            }
+
+            40% {
+                transform: scale(1.0);
+            }
+        }
+
+        .bounce1 {
+            animation-delay: -0.32s;
+        }
+
+        .bounce2 {
+            animation-delay: -0.16s;
+        }
+
+        .bouncing-loader>div {
+            width: 1rem;
+            height: 1rem;
+            background-color: #fff;
+            border-radius: 100%;
+            display: inline-block;
+            animation: bounce-delay 1.4s infinite ease-in-out both;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="w-full max-w-md mx-auto bg-gray-800 rounded-2xl shadow-2xl p-6 text-center">
+
+        <!-- Header -->
+        <h1 class="text-3xl font-bold text-white mb-2">AI Alarm Buddies</h1>
+        <p class="text-lg text-gray-400 mb-6">Your interactive alarm clock.</p>
+
+        <!-- Buddy Selection -->
+        <div id="buddy-selection" class="mb-8">
+            <h2 class="text-xl font-semibold mb-4">Select your buddy:</h2>
+            <div class="grid grid-cols-3 gap-4">
+                <button onclick="startAlarm('Sunny')"
+                    class="p-4 bg-yellow-500 rounded-lg shadow-lg hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:ring-opacity-50 transition-transform transform hover:scale-105">
+                    <span class="text-4xl">☀️</span>
+                    <span class="block text-lg font-semibold text-gray-900">Sunny</span>
+                    <span class="text-sm text-gray-800">Energetic</span>
+                </button>
+                <button onclick="startAlarm('Aurora')"
+                    class="p-4 bg-green-500 rounded-lg shadow-lg hover:bg-green-400 focus:outline-none focus:ring-2 focus:ring-green-300 focus:ring-opacity-50 transition-transform transform hover:scale-105">
+                    <span class="text-4xl">🧘</span>
+                    <span class="block text-lg font-semibold text-gray-900">Aurora</span>
+                    <span class="text-sm text-gray-800">Calm</span>
+                </button>
+                <button onclick="startAlarm('Ray')"
+                    class="p-4 bg-pink-500 rounded-lg shadow-lg hover:bg-pink-400 focus:outline-none focus:ring-2 focus:ring-pink-300 focus:ring-opacity-50 transition-transform transform hover:scale-105">
+                    <span class="text-4xl">😂</span>
+                    <span class="block text-lg font-semibold text-gray-900">Ray</span>
+                    <span class="text-sm text-gray-800">Funny</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Alarm UI -->
+        <div id="alarm-ui" class="hidden">
+            <div id="buddy-icon" class="text-6xl mb-4"></div>
+            <h2 id="buddy-name" class="text-2xl font-bold mb-4"></h2>
+
+            <!-- Status & Messages -->
+            <div classs="w-full h-40 flex flex-col justify-center items-center">
+                <div id="loader" class="bouncing-loader hidden my-8">
+                    <div class="bounce1"></div>
+                    <div class="bounce2"></div>
+                    <div class="bounce3"></div>
+                </div>
+                <div id="message-display" class="text-xl text-gray-300 my-4 h-24">Select a buddy to start</div>
+            </div>
+
+            <!-- Controls -->
+            <div class="mt-6">
+                <button id="mic-button"
+                    class="hidden w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto shadow-xl hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-50 transition-all">
+                    <!-- Mic Icon SVG -->
+                    <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z">
+                        </path>
+                    </svg>
+                </button>
+
+                <button id="stop-button" onclick="stopAlarm()"
+                    class="mt-6 px-6 py-3 bg-red-600 text-white text-lg font-semibold rounded-lg shadow-md hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-50">
+                    Stop Alarm
+                </button>
+            </div>
+        </div>
+
+        <!-- Error Display -->
+        <div id="error-box" class="hidden mt-4 bg-red-800 border border-red-700 text-red-100 px-4 py-3 rounded-lg">
+            <strong>System Error:</strong>
+            <span id="error-message"></span>
+        </div>
+
+    </div>
+
+    <script>
+        // --- API & VOICE CONFIGURATION ---
+        // Gemini API Configuration (Required for Text Generation)
+        const GEMINI_API_KEY = "AIzaSyAVgRnmCkWjd1QUREw0uZvL07mw3N26RL4"; // Replace with your key
+        const GEMINI_LLM_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
+
+        // Puter.js Voices (Used for High-Quality TTS)
+        // Sunny: Matthew (Energetic Male) | Aurora: Ruth (Calm Female) | Ray: Brian (Funny Male)
+        const PUTTER_VOICES = {
+            'Sunny': { voice: 'Matthew', language: 'en-US', engine: 'neural' },
+            'Aurora': { voice: 'Ruth', language: 'en-US', engine: 'neural' },
+            'Ray': { voice: 'Brian', language: 'en-US', engine: 'neural' }
+        };
+
+        // --- GLOBAL VARIABLES ---
+        let currentBuddy = '';
+        let chatHistory = [];
+        let isPlaying = false;
+        let isListening = false;
+        let isFinalMessage = false;
+        let isProcessing = false; // Guard to prevent double-speak/race conditions
+        let currentAudio = null; // Holds the current Puter audio object
+
+        // Helper function to wait
+        const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        // UI Elements
+        const buddySelectionEl = document.getElementById('buddy-selection');
+        const alarmUiEl = document.getElementById('alarm-ui');
+        const messageDisplay = document.getElementById('message-display');
+        const loader = document.getElementById('loader');
+        const micButton = document.getElementById('mic-button');
+        const stopButton = document.getElementById('stop-button');
+        const buddyIcon = document.getElementById('buddy-icon');
+        const buddyName = document.getElementById('buddy-name');
+        const errorBox = document.getElementById('error-box');
+        const errorMessage = document.getElementById('error-message');
+
+        // --- SPEECH RECOGNITION (STT) ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            showError("Speech recognition is not supported in this browser.");
+        }
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+
+        // --- CORE FUNCTIONS ---
+        async function startAlarm(buddy) {
+            if (isProcessing) return;
+            isProcessing = true;
+            
+            // Reset state
+            stopAlarm(); // Clear any previous state
+            currentBuddy = buddy;
+            isFinalMessage = false;
+            errorBox.classList.add('hidden'); // Clear previous errors
+
+            // Update UI
+            buddySelectionEl.classList.add('hidden');
+            alarmUiEl.classList.remove('hidden');
+            micButton.classList.add('hidden');
+            loader.classList.remove('hidden'); // Show loader
+            messageDisplay.innerText = `Connecting to ${buddy}...`;
+
+            // Set buddy UI
+            const buddyData = {
+                'Sunny': { icon: '☀️', name: 'Sunny' },
+                'Aurora': { icon: '🧘', name: 'Aurora' },
+                'Ray': { icon: '😂', name: 'Ray' }
+            };
+            buddyIcon.innerText = buddyData[buddy].icon;
+            buddyName.innerText = buddyData[buddy].name;
+
+            const greeting = getGreeting(buddy);
+            messageDisplay.innerText = `"${greeting}"`;
+
+            try {
+                // 1. Add greeting to history
+                chatHistory.push({ role: 'model', parts: [{ text: greeting }] });
+                
+                // 2. Get audio for the greeting using Puter.js
+                await playAudio(greeting, currentBuddy);
+
+            } catch (error) {
+                console.error("Error starting alarm:", error);
+                showError(error.error || error.message || "Failed to start alarm. Check network or API key.");
+                stopAlarm();
+            } finally {
+                isProcessing = false;
+            }
+        }
+
+        function stopAlarm() {
+            isFinalMessage = true; // Signal to end conversation
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+            }
+            isPlaying = false;
+            if (isListening) {
+                recognition.stop();
+                isListening = false;
+            }
+            chatHistory = []; // Clear history
+            currentBuddy = ''; // Clear buddy
+            buddySelectionEl.classList.remove('hidden');
+            alarmUiEl.classList.add('hidden');
+            loader.classList.add('hidden');
+            micButton.classList.add('hidden');
+            messageDisplay.innerText = "Select a buddy to start";
+            isProcessing = false;
+        }
+
+        function showError(message) {
+            errorMessage.innerText = message;
+            errorBox.classList.remove('hidden');
+            // Hide the error after 5 seconds
+            setTimeout(() => {
+                // Check if the message is still the same before hiding
+                if (errorMessage.innerText === message) {
+                    errorBox.classList.add('hidden');
+                }
+            }, 8000);
+        }
+
+        // --- CONVERSATION FLOW ---
+        async function handleUserTurn(transcript) {
+            if (isFinalMessage || isProcessing) return;
+            isProcessing = true;
+            
+            try {
+                // 1. Add user's turn to history
+                chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
+                
+                // 2. Get AI response
+                loader.classList.remove('hidden');
+                micButton.classList.add('hidden');
+                
+                const aiResponse = await callGeminiAPI(chatHistory);
+                chatHistory.push({ role: 'model', parts: [{ text: aiResponse }] });
+                messageDisplay.innerText = `"${aiResponse}"`;
+
+                // 3. Get audio for AI response
+                await playAudio(aiResponse, currentBuddy);
+
+            } catch (error) {
+                console.error("Error in conversation flow:", error);
+                showError(error.error || error.message || "An unexpected error occurred in the conversation flow.");
+                stopAlarm(); // Stop if there's a critical error
+            } finally {
+                isProcessing = false;
+            }
+        }
+
+        // --- SPEECH RECOGNITION HANDLERS ---
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            messageDisplay.innerText = `You said: "${transcript}"`;
+            handleUserTurn(transcript); 
+        };
+
+        recognition.onend = () => {
+            isListening = false;
+            if (isFinalMessage || isPlaying || isProcessing) {
+                return; // Don't continue if alarm is stopped, playing, or already processing
+            }
+            // If listening ended and we're not playing audio, it means silence.
+            console.warn("User was silent. Attempting to re-engage...");
+            loader.classList.remove('hidden');
+            micButton.classList.add('hidden');
+            // Send special signal to the AI
+            handleUserTurn('(User was silent. Please re-engage them gently...)'); 
+        };
+
+        recognition.onstart = () => {
+            isListening = true;
+            micButton.classList.add('hidden');
+            loader.classList.remove('hidden');
+            // No Barge-in: We let the AI finish talking first.
+        };
+
+        recognition.onerror = (event) => {
+            isListening = false;
+            console.warn("Speech recognition warning:", event.error);
+            // If the error is not due to silence or interruption, log it.
+            if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                showError("Speech recognition error: " + event.error);
+            }
+            // If listening ended and we're not playing audio, it means silence.
+            if (!isPlaying && !isFinalMessage && !isProcessing) {
+                 loader.classList.add('hidden');
+                 micButton.classList.remove('hidden');
+            }
+        };
+
+        // --- AUDIO PLAYBACK (Puter.js) ---
+        function playAudio(text, buddy) {
+            const voiceConfig = PUTTER_VOICES[buddy];
+            
+            // FIX: Ensure no concurrent audio (double speak)
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+            }
+
+            return new Promise((resolve, reject) => {
+                isPlaying = true;
+                loader.classList.add('hidden');
+                micButton.classList.add('hidden'); 
+                
+                // Call Puter.js TTS API
+                puter.ai.txt2speech(text, {
+                    voice: voiceConfig.voice,
+                    engine: voiceConfig.engine,
+                    language: voiceConfig.language
+                })
+                .then((audio) => {
+                    currentAudio = audio;
+
+                    audio.onended = () => {
+                        isPlaying = false;
+                        if (isFinalMessage) {
+                            stopAlarm();
+                        } else {
+                            // Audio finished, start listening for user
+                            loader.classList.add('hidden');
+                            micButton.classList.remove('hidden');
+                            if (!isListening) {
+                                try {
+                                    recognition.start();
+                                } catch (e) {
+                                    console.warn("Recognition already started, ignoring.");
+                                }
+                            }
+                        }
+                        resolve();
+                    };
+
+                    audio.onerror = (e) => {
+                         isPlaying = false;
+                         const errorMsg = "Failed to play audio. Check Puter.js API status.";
+                         showError(errorMsg);
+                         console.error("Puter.js Audio Error:", e);
+                         // Try to recover by listening
+                         loader.classList.add('hidden');
+                         micButton.classList.remove('hidden');
+                         if (!isListening) {
+                            try {
+                                recognition.start();
+                            } catch (e) {
+                                console.warn("Recognition already started, ignoring.");
+                            }
+                        }
+                        reject(new Error(errorMsg));
+                    };
+
+                    audio.play()
+                    .catch(error => {
+                        // This catches errors if the browser blocks play() before interaction
+                        console.error("Audio play error (catch):", error);
+                        // Show mic button if play was blocked by browser policy
+                        loader.classList.add('hidden');
+                        micButton.classList.remove('hidden');
+                        reject(error);
+                    });
+                })
+                .catch(error => {
+                    // This catches errors from the puter.ai.txt2speech call itself
+                    console.error("Puter.js API Error:", error);
+                    // The error object from Puter.js might be {success: false, error: "message"}
+                    const errorMsg = error.error || error.message || "Unknown Puter.js error";
+                    showError("Puter.js API Error: " + errorMsg);
+                    isProcessing = false; // Release lock
+                    reject(error);
+                });
+            });
+        }
+
+        // --- API CALLS (Gemini LLM) ---
+
+        /**
+         * Helper function to extract delay from a 429 error
+         */
+        function getRetryDelay(errorData) {
+            let delayMs = 5000; // Default 5s wait
+            try {
+                // Try to find the specific retryDelay
+                const retryInfo = errorData.error.details.find(
+                    d => d['@type'] === 'type.googleapis.com/google.rpc.RetryInfo'
+                );
+                if (retryInfo && retryInfo.retryDelay) {
+                    const seconds = parseInt(retryInfo.retryDelay.replace('s', '')) || 5;
+                    delayMs = (seconds * 1000) + 500; // Add 500ms buffer
+                    console.warn(`Rate limit hit. Retrying in ${delayMs}ms...`);
+                }
+            } catch (e) {
+                console.warn("Could not parse retryDelay, defaulting to 5s.");
+            }
+            return delayMs;
+        }
+
+
+        /**
+         * Calls the Gemini LLM API to get a text response.
+         * @param {Array} history - The chat history.
+         * @param {number} retryCount - Internal count for retries.
+         */
+        async function callGeminiAPI(history, retryCount = 0) {
+            const systemPrompt = getSystemPrompt(currentBuddy);
+            
+            // FIX: Give the AI a better memory by sending the last 10 messages
+            const prunedHistory = history.slice(-10);
+
+            const payload = {
+                contents: prunedHistory, // Use the pruned history
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+                generationConfig: {
+                    maxOutputTokens: 400, // Keep this high for safety
+                    temperature: 0.8,
+                    topP: 0.8,
+                }
+            };
+
+            let response;
+            try {
+                // Use LLM-specific URL
+                response = await fetch(GEMINI_LLM_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+            } catch (error) {
+                console.error("Gemini API network error:", error);
+                throw new Error("Gemini API Error: Network failed.");
+            }
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error("Gemini API Error Response Body:", errorData);
+
+                // *** FIX: Retry up to 5 times for 429 rate limits ***
+                if (response.status === 429 && retryCount < 5) { // Retry up to 5 times
+                    const delayMs = getRetryDelay(errorData);
+                    await wait(delayMs);
+                    return callGeminiAPI(history, retryCount + 1); // Retry
+                }
+                
+                // Specific check for the 'limit: 0' error
+                if (errorData?.error?.message.includes("limit: 0")) {
+                    throw new Error(`Gemini API Error: Your project has a quota of 0. Please check your Google Cloud billing.`);
+                }
+
+                throw new Error(`Gemini API Error: ${errorData.error.message}`);
+            }
+
+            const result = await response.json();
+            console.log("Gemini API Response:", result);
+
+            if (result.candidates && result.candidates.length > 0) {
+                const candidate = result.candidates[0];
+                if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+                    return candidate.content.parts[0].text;
+                } else if (candidate.finishReason !== "STOP") {
+                    console.error("Unexpected Gemini API response structure:", result);
+                    // Handle specific MAX_TOKENS error
+                    if (candidate.finishReason === "MAX_TOKENS") {
+                        showError("Gemini response blocked. Reason: MAX_TOKENS");
+                        // Don't throw, just return a fallback message
+                        return "Sorry, I got a bit lost in thought! What were we saying?";
+                    }
+                    throw new Error(`Gemini response blocked. Reason: ${candidate.finishReason}`);
+                }
+            }
+
+            console.error("Unexpected Gemini API response structured:", result);
+            throw new Error("Failed to get response from AI. Invalid response structure.");
+        }
+
+        // --- PROMPT ENGINEERING ---
+
+        function getSystemPrompt(buddy) {
+            // FIX: Made prompts even stricter to ensure short, high-emotion responses
+            const basePrompt = `You are an AI alarm clock buddy. Your #1 job is to be a conversation partner to wake a sleepy user.
+YOUR PERSONALITY: [PERSONALITY_PROMPT_GOES_HERE]
+YOUR RULES:
+- BE EXTREMELY BRIEF: Your response MUST be a single, short sentence. This is a non-negotiable rule.
+- BE INTERACTIVE: Always ask a simple, open-ended question.
+- BE NATURAL: Speak like a real person, not a robot.
+- (User was silent...): If you get this message, just ask a simple, new question. Do not apologize or mention the silence.
+NOTE: You will only see the last 10 turns of the conversation. Use this context to respond intelligently.`;
+
+            let personalityPrompt = '';
+            if (buddy === 'Sunny') {
+                personalityPrompt = "You are 'Sunny'. Your tone MUST be extremely passionate and enthusiastic. You are energetic and motivational!";
+            } else if (buddy === 'Aurora') {
+                personalityPrompt = "You are 'Aurora'. Your tone MUST be warm, calm, and soothing. You are gentle and nurturing.";
+            } else if (buddy === 'Ray') {
+                personalityPrompt = "You are 'Ray'. Your tone MUST be high-energy and comedic. Be a bit cheeky and make a short, witty observation.";
+            }
+            return basePrompt.replace('[PERSONALITY_PROMPT_GOES_HERE]', personalityPrompt);
+        }
+
+        function getGreeting(buddy) {
+            if (buddy === 'Sunny') {
+                return "Rise and shine! It's a brand new day, and it's time to make it amazing! You up?";
+            } else if (buddy === 'Aurora') {
+                return "Good morning... The birds are singing, and the world is waiting. How about we gently start our day?";
+            } else if (buddy === 'Ray') {
+                return "You know, the early bird gets the worm... or in your case, maybe just the coffee? Time to get up!";
+            }
+            return "Hello! Time to wake up.";
+        }
+        
+    </script>
+</body>
+
+</html>
+
+
+
+
